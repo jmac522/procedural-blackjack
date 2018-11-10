@@ -1,264 +1,404 @@
 /* John McCarthy
-6/7/2018 CIT-237-01
-Final Project : Genetic Algorithm to evolve a population of
-randome cstrings to match a target phrase */
-#include <string> // include string
-#include <cctype> // include cc type for character manipulation
-#include <iostream> // for getline
-#include <ctime> // ctime for rand seeed
-#include <vector> // include vector
-using namespace std; // define std namespace
+CIT-120 Final Project
+Blackjack Game
+*/
+#include <iostream>
+#include <iomanip>
+#include <vector>
+#include <string>
+#include <algorithm>
+#include <random>		// for default_random_engine
+#include <stdlib.h> // srand, rand
+#include <time.h>		// get current time for unique random seeds
+#include <functional> // for greater objects
+using namespace std;
 
-					 // constant lookup table for alphanumeric characters
-const char alphanum[] =
-"0123456789 "
-"ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-"abcdefghijklmnopqrstuvwxyz";
+// function prototypes
+void printMainMenu();
+void shuffleDeck(vector<int>&); // function to shuffle a deck
+string printCard(int); // function to print a card as a string
+void dealHand(vector<int>&, vector<int>&, vector<int>&, int &); // Function to deal an inital hand
+void playGame(); // main game function
+void showRoundMenu(); // Display the Hit/Stand options
+void playRound(vector<int>&, bool &); // function for a signle round of the game
+int getCardValue(int, int &, int &); // Determine numerical value of a given card
+int getHandTotal(vector<int>&, int &); // Find total value of a hand
+void playerRound(vector<int>&, vector<int>&, int &, bool &, int); // Players turn after initial hand is dealt
+void dealPlayerCard(vector<int>&, vector<int>&, int &, bool &, int); // Deal a single card in player rounds
+void dealerRound(vector<int>&, vector<int>&, int &, bool &); // Handles dealer after player has finished
+bool playAgain(); // Ask user if they want to play another hand
+void checkWinner(int, int);
 
-static char generateRandomChar() {
-	// select a random character from the alphanum constant and return it
-	return alphanum[rand() % ((sizeof(alphanum) / sizeof(*alphanum)) - 1)];
-}
+// assign integer values to card type constants
+const int ace = 100,
+deuce = 200,
+three = 300,
+four = 400,
+five = 500,
+six = 600,
+seven = 700,
+eight = 800,
+nine = 900,
+ten = 1000,
+jack = 1100,
+queen = 1200,
+king = 1300;
 
+// Create a vector constand for a deck to use for building a deck
+const vector<int> DECK = { 100, 100, 100, 100, 200, 200, 200, 200, 300, 300,
+300, 300, 400, 400, 400, 400, 500, 500, 500, 500,
+600, 600, 600, 600, 700, 700, 700, 700, 800, 800,
+800, 800, 900, 900, 900, 900, 1000, 1000, 1000, 1000,
+1100, 1100, 1100, 1100, 1200, 1200, 1200, 1200,
+1300, 1300, 1300, 1300 };
 
-class Dna {
+// string constant for formatting
+const string INDENT = "\t\t\t\t\t";
 
-	int fitness;
-	double selectionProbability;
-public:
-	vector<char> genes;
-	Dna();
-	Dna(int);
-	Dna(const Dna &);
-	vector<char> getPhrase();
-	void calcFitness(string);
-	Dna crossover(Dna, double);
-	void mutate(double);
-	double getFitness() { return fitness; }
-	void setSelectionProbability(double sProb) { selectionProbability = sProb; }
-	double getSelectionProbability() { return selectionProbability; }
-	void addGene(char);
-};
+void main()
+{
+	// variable for holding menu choice
+	int menu_choice;
 
-class Population {
-	// Holds an array of the current DNA objects in the population
-	vector<Dna> population;
-	// Vector to hold mating pool for selecting parents
-	vector<Dna> matingPool;
-	// Counter to keep track of the # of generations that have been created
-	int generations = 0;
-	// Boolean to keep track of if target phrase was found
-	bool targetFound = false;
-	// cstring holding the target phrase
-	string target;
-	// double holding the mutation rate for the population
-	double mutationRate;
-	// int holding the "perfect" fitness score
-	double perfectScore = 1.0;
-	// string that holds the current best member of a generation
-	string best = "";
-public:
-	Population(string, double, int);
-	~Population() {};
-	void generate();
-	void findBest();
-	bool isTargetFound();
-	string getBest() { return best; }
-	void calculateFitness();
-	Dna selectPopulationMember();
-	void generateMatingPool();
-	int getGeneration() { return generations; }
-};
+	// display the main menu and get choice from user
+	printMainMenu();
+	cout << "\t\tSelection: ";
+	cin >> menu_choice;
 
-
-
-// Constrcutor
-Population::Population(string targetString,
-	double mRate,
-	int populationSize) {
-	// Set the perfect score based on size of targetString
-	// this->perfectScore = targetString.length();
-	// Set the target using the passed string
-	this->target = targetString;
-	this->perfectScore = targetString.length() * targetString.length();
-	// Set the mutation rate
-	this->mutationRate = mRate;
-	// Add appropriate number of DNA objects based on the population size passed
-	for (int i = 0; i < (populationSize); i++) {
-		this->population.push_back(Dna(targetString.length()));
-	}
-	// Calculate the fitness of each of the members of the population
-	calculateFitness();
-}
-
-void Population::calculateFitness() {
-	// Go through each DNA object and call its individudal calc fitness method
-	// keep track of found fitnesses in sum counter for assigning
-	// each items selectionProbability
-	int sum = 0;
-	for (int i = 0; i < population.size(); i++) {
-		population[i].calcFitness(target);
-		sum += population[i].getFitness();
+	// validate user input
+	while (menu_choice < 1 || menu_choice > 2) {
+		cout << "Please make a valid selection: ";
+		cin >> menu_choice;
 	}
 
-	for (int i = 0; i < population.size(); i++) {
-		// population[i].setSelectionProbability((double)population[i].getFitness() / (double)sum);
-		population[i].setSelectionProbability(population[i].getFitness());
+	// Start game or exit program based on selection
+	switch (menu_choice) {
+	case 1:
+	{
+		// NEW GAME
+
+		// Clear the console
+		system("cls");
+
+		// Start the game
+		playGame();
+		break;
 	}
-}
-
-// Method to create a new generation of the population
-void Population::generate() {
-	for (int i = 0; i < population.size(); i++) {
-		Dna parentOne = selectPopulationMember();
-		Dna parentTwo = selectPopulationMember();
-		Dna child = parentOne.crossover(parentTwo, this->mutationRate);
-		population[i] = child;
-	}
-	// incrament the number of generations
-	this->generations++;
-}
-
-void Population::generateMatingPool() {
-	this->matingPool.clear();
-	for (int i = 0; i < population.size(); i++) {
-		for (int j = 0; j < population[i].getFitness(); j++) {
-			this->matingPool.push_back(Dna(population[i]));
-		}
-	}
-}
-
-// Method to find the member of the population with the highest fitness
-void Population::findBest() {
-	int maxFound = 0;
-	int foundIndex = 0;
-
-	for (int i = 0; i < population.size(); i++) {
-		if (population[i].getFitness() > maxFound) {
-			foundIndex = i;
-			maxFound = population[i].getFitness();
-		}
+	case 2:
+		// QUIT
+		cout << "Thanks for playing!!\n";
+		break;
 	}
 
-	vector<char> foundGenes = population[foundIndex].getPhrase();
-	string str(foundGenes.begin(), foundGenes.end());
-	best = str;
-
-	if (maxFound == perfectScore) {
-		targetFound = true;
-	}
-}
-
-bool Population::isTargetFound() {
-	return targetFound;
-}
-
-
-Dna Population::selectPopulationMember() {
-	// int index = 0;
-	// double randomNumber = ((double)rand() / (RAND_MAX));
-	// while (randomNumber > 0) {
-	// 	if (population[index].getSelectionProbability() >= 0) {
-	// 		randomNumber = randomNumber - (population[index].getSelectionProbability());
-	// 		index++;
-	// 	}
-	// }
-	// index--;
-	int randomNumber = (rand() % this->matingPool.size());
-	return matingPool[randomNumber];
-}
-
-Dna::Dna() {
-
-}
-
-// DNA constructor
-Dna::Dna(int targetLength) {
-	// set initial fitness to zero
-	this->fitness = 0;
-	// generate random char array at length of target phrase
-	for (int i = 0; i < (targetLength); i++) {
-		genes.push_back(generateRandomChar());
-	}
-}
-
-Dna::Dna(const Dna &dna) {
-	this->fitness = dna.fitness;
-	this->genes = dna.genes;
-}
-
-void Dna::addGene(char geneMember) {
-	this->genes.push_back(geneMember);
-}
-
-vector<char> Dna::getPhrase() {
-	return this->genes;
-}
-
-
-// Method to calculate the fitness of a DNA object in comparison to the target
-// phrase
-void Dna::calcFitness(string targetPhrase) {
-	int score = 0;
-	for (int i = 0; i < genes.size(); i++) {
-		if (genes[i] == targetPhrase.at(i)) {
-			score++;
-		}
-	}
-	//
-	this->fitness = score * score;
-	// this -> selectionProbability =
-}
-
-// Method to generate a child out of 2 DNA objects
-Dna Dna::crossover(Dna partner, double mutationRate) {
-	// Create a new DNA object
-	Dna child = Dna();
-	// select a random midpoint to split the parents genes
-	int midpoint = rand() % (genes.size() - 1);
-
-	// Assign genes to child from one of the parents based on the midpoint
-	for (int i = 0; i < genes.size(); i++) {
-		if (i > midpoint) {
-			child.addGene(genes[i]);
-		}
-		else {
-			child.addGene(partner.getPhrase()[i]);
-		}
-	}
-	child.mutate(mutationRate);
-	// return the new child
-	return child;
-}
-
-void Dna::mutate(double mutationRate) {
-	// generate a random number between 0 and 1
-	double randomDouble = ((double)rand() / (RAND_MAX));
-	for (int i = 0; i < genes.size(); i++) {
-		if (randomDouble < mutationRate) {
-			genes[i] = generateRandomChar();
-		}
-	}
-}
-
-
-
-void main() {
-	srand(time(NULL)); // seed rand
-	string targetPhrase = "Wubba Lubba";
-	double mutationRate = 0.1;
-	int populationSize = 200;
-	Population poppy = Population(targetPhrase, 0.1, 200);
-
-	do {
-		poppy.generateMatingPool();
-		poppy.generate();
-		poppy.calculateFitness();
-		poppy.findBest();
-		cout << poppy.getBest() << endl;
-	} while (!poppy.isTargetFound());
-	cout << "We found that biz" << endl;
-	cout << poppy.getBest() << endl;
-	cout << poppy.getGeneration() << endl;
 	system("pause");
+}
+
+void shuffleDeck(vector<int>& deck) {
+	// Generator for shuffle function
+	auto randomNumberGenerator = default_random_engine{};
+
+	// Use current time as seed to prevent same output everytime program is run
+	srand(time(NULL));
+
+	// Generate number between 1 and 100 for number of times to shuffle the deck
+	int shuffle_multiplier = rand() % 100 + 1;
+
+	// shuffle multiple times to avoid same output
+	for (int i = 0; i < shuffle_multiplier; i++)
+		shuffle(begin(deck), end(deck), randomNumberGenerator);
+}
+
+string printCard(int card) {
+	string card_type;
+	switch (card) {
+	case ace:
+		card_type = "A";
+		break;
+	case deuce:
+		card_type = "2";
+		break;
+	case three:
+		card_type = "3";
+		break;
+	case four:
+		card_type = "4";
+		break;
+	case five:
+		card_type = "5";
+		break;
+	case six:
+		card_type = "6";
+		break;
+	case seven:
+		card_type = "7";
+		break;
+	case eight:
+		card_type = "8";
+		break;
+	case nine:
+		card_type = "9";
+		break;
+	case ten:
+		card_type = "10";
+		break;
+	case jack:
+		card_type = "J";
+		break;
+	case queen:
+		card_type = "Q";
+		break;
+	case king:
+		card_type = "K";
+		break;
+	}
+
+	return card_type;
+}
+
+void printMainMenu() {
+	const int WIDTH = 40;
+	cout << INDENT << char(201) << string(39, 205) << char(187) << "\n";
+	cout << INDENT << char(186) << "\tWelcome to C++ Blackjack\t" << char(186) << "\n";
+	cout << INDENT << char(200) << string(39, 205) << char(188) << "\n";
+	cout << INDENT << "\t\t1. New Game\n";
+	cout << INDENT << "\t\t2. Quit\n";
+}
+
+void dealHand(vector<int>& deck, vector<int>& player_hand, vector<int>& dealer_hand, int &player_total) {
+	system("cls");
+	cout << INDENT << char(201) << string(25, 205) << char(187) << "\n";
+	cout << INDENT << char(186) << "     Dealing hand...     " << char(186) << "\n";
+	cout << INDENT << char(200) << string(25, 205) << char(188) << "\n";
+	// Deal 2 cards to each player
+	for (int i = 0; i < 2; i++) {
+		player_hand.push_back(deck.back());
+
+		deck.pop_back(); // Remove card from deck
+		dealer_hand.push_back(deck.back());
+		deck.pop_back();
+	}
+
+	cout << INDENT << "The player has " << printCard(player_hand[0])
+		<< " and  " << printCard(player_hand[1]) << " totaling "
+		<< getHandTotal(player_hand, player_total) << endl;
+	cout << INDENT << "The dealer is showing " << printCard(dealer_hand[1]) << endl;
+}
+
+void playGame() {
+	// create a deck for the game and shuffle it
+	vector<int> game_deck = DECK;
+	shuffleDeck(game_deck);
+
+	// boolean flag for tracking if user wishes to continue playing. True by default
+	bool continue_game = true;
+
+	while (continue_game) {
+		if (game_deck.size() < 10) {
+			// generate new deck if not enough cards for a new round
+			cout << "\n\n";
+			cout << INDENT << char(201) << string(25, 205) << char(187) << "\n";
+			cout << INDENT << char(186) << "    Shuffling Deck...    " << char(186) << "\n";
+			cout << INDENT << char(200) << string(25, 205) << char(188) << "\n";
+			game_deck = DECK;
+			shuffleDeck(game_deck);
+		}
+		playRound(game_deck, continue_game);
+		// continue_game = false; // temporary flag change to avoid infinite loop
+	}
+	// system("cls");
+}
+
+void showRoundMenu() {
+	cout << INDENT << "\t1. Hit\n";
+	cout << INDENT << "\t2. Stand\n";
+}
+
+void playRound(vector<int>& game_deck, bool &continue_game) {
+	// Vectors for player's hand and dealer's hand
+	vector<int> player_hand, dealer_hand;
+
+	// initialize counters for player and dealer hand totals
+	int player_total = 0, dealer_total = 0;
+
+	// Bust flags to keep track of if player or dealer busts
+	bool bust = false;
+	bool dealer_bust = false;
+	bool play_again;
+
+	// Deal initial hand
+	dealHand(game_deck, player_hand, dealer_hand, player_total);
+
+	// Go through players turn
+	playerRound(player_hand, game_deck, player_total, bust, dealer_hand[1]);
+
+	if (!bust) {
+		// Go through dealer's turn
+		dealerRound(dealer_hand, game_deck, dealer_total, dealer_bust);
+		// Determine winner
+		if (!dealer_bust) {
+			checkWinner(player_total, dealer_total);
+		}
+	}
+
+	if (!playAgain()) {
+		continue_game = false;
+	}
+}
+
+int getCardValue(int card, int &hand_total, int &ace_counter) {
+	if (card >= deuce && card <= ten) {
+		// if card is between 2 or 10, its value is what is listed on the card
+		hand_total += card / 100;
+	}
+	else if (card > ten) {
+		// face cards all have the value of 10
+		hand_total += 10;
+	}
+	else {
+		// If the card is an ace, add 11 and increment ace counter for later bust check
+		hand_total += 11;
+		ace_counter += 1;
+	}
+
+	return hand_total;
+}
+
+int getHandTotal(vector<int>& hand, int &hand_total) {
+	hand_total = 0;
+	int ace_counter = 0;
+	for (int card : hand) {
+		// increment total for each cart in hand thats passed to the function
+		getCardValue(card, hand_total, ace_counter);
+	}
+
+	if (ace_counter > 0) {
+		// adjust ace value from 11 to 1 if 11 will bust the hand
+		for(ace_counter; ace_counter > 0; ace_counter--) {
+			if (hand_total > 21) {
+				hand_total -= 10;
+			}
+		}
+	}
+	// return final total
+	return hand_total;
+}
+
+void playerRound(vector<int>& hand, vector<int>& deck, int &hand_total, bool &bust, int dealer_showing) {
+	bool stand = false; // Keep track of if player stands to end turn
+	// Menu Choice variable
+	int menu_choice;
+	while (!bust && !stand) {
+
+		// Show options for hit/stand
+		showRoundMenu();
+
+		// Get and validate user choice
+		cout << "\t\tChoice: ";
+		cin >> menu_choice;
+		cout << "\n\n";
+
+		while (menu_choice < 1 || menu_choice > 2) {
+			cout << "Please make a valid selection: ";
+			cin >> menu_choice;
+		}
+
+		switch (menu_choice) {
+		case 1:
+			// Player hits
+			dealPlayerCard(hand, deck, hand_total, bust, dealer_showing);
+			break;
+		case 2:
+			// Player Stands
+			stand = true;
+			cout << INDENT << "You stand at " << getHandTotal(hand, hand_total) << endl;
+			cout << "\n\n";
+			break;
+		}
+	}
+}
+
+void dealPlayerCard(vector<int>& hand, vector<int>& deck, int &hand_total, bool &bust, int dealer_showing) {
+	hand.push_back(deck.back());
+	deck.pop_back();
+	// system("cls");
+	cout << INDENT << "You are dealt " << printCard(hand.back()) << endl;
+	cout << INDENT << "You have ";
+	for (int card : hand) {
+		cout << printCard(card) << " ";
+	}
+	cout << "totalling " << getHandTotal(hand, hand_total) << endl;
+	if (hand_total > 21) {
+		bust = true;
+		cout << INDENT << "You busted! Better luck next time.\n\n\n";
+	}
+	else {
+		cout << INDENT << "The dealer is showing " << printCard(dealer_showing) << "\n\n";
+	}
+
+}
+
+void dealerRound(vector<int>& hand, vector<int>& deck, int &hand_total, bool &bust) {
+	cout << INDENT << "Dealer will play now....\n";
+	// Display both dealers cards
+	cout << INDENT << "The dealer has ";
+	for (int card : hand) {
+		cout << printCard(card) << " ";
+	}
+	cout << "totalling " << getHandTotal(hand, hand_total) << endl;
+
+	// The dealer must hit until his hand is 16 or greater or until busting
+	while (!bust && hand_total < 16) {
+		hand.push_back(deck.back());
+		deck.pop_back();
+		cout << INDENT << "The dealer is dealt " << printCard(hand.back()) << endl;
+		cout << INDENT << "Their total is " << getHandTotal(hand, hand_total) << endl;
+		if (hand_total > 21) {
+			bust = true;
+			cout << INDENT << "The Dealer busted. You Win!\n";
+		}
+	}
+	cout << "\n\n";
+}
+
+bool playAgain() {
+	bool play_again;
+	int menu_choice;
+	cout << INDENT << "Want to play another hand?\n\n";
+	cout << INDENT << "\t1. Yes\n";
+	cout << INDENT << "\t2. No\n";
+	cout << "\t\tChoice: ";
+	cin >> menu_choice;
+
+	while (menu_choice < 1 || menu_choice > 2) {
+		cout << "Please make a valid selection: ";
+		cin >> menu_choice;
+	}
+
+	switch (menu_choice) {
+	case 1:
+		play_again = true;
+		break;
+	case 2:
+		play_again = false;
+		cout << "Goodbye...\n";
+		break;
+	}
+
+	return play_again;
+}
+
+void checkWinner(int player_total, int dealer_total) {
+	cout << INDENT << "The player has " << player_total << endl;
+	cout << INDENT << "The dealer has " << dealer_total << endl;
+	cout << "\n\n";
+	if (player_total > dealer_total) {
+		cout << INDENT << "You win!!\n";
+	}
+	else if (dealer_total > player_total) {
+		cout << INDENT << "The dealer wins. Better luck next time!\n";
+	}
+	else {
+		cout << INDENT << "Push!\n";
+	}
+	cout << "\n\n";
 }
